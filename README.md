@@ -1,0 +1,1 @@
+Please notice that I didn't write any of these codes by myself. It's all thanks to Claude AI. ¯\\\_(ツ)\_/¯
