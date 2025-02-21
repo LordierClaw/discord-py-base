@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
+import importlib.util
 from config import TOKEN, PREFIX, GUILD_ID
 from utils.logger import setup_logger
 
@@ -25,14 +26,35 @@ class Bot(commands.Bot):
         self.logger = logger
     
     async def setup_hook(self):
-        # Load all cogs
-        for filename in os.listdir('./cogs'):
-            if filename.endswith('.py') and not filename.startswith('_'):
-                try:
-                    await self.load_extension(f'cogs.{filename[:-3]}')
-                    self.logger.info(f'Loaded extension: cogs.{filename[:-3]}')
-                except Exception as e:
-                    self.logger.error(f'Failed to load extension {filename}: {e}')
+        # Load all cogs from their subfolders
+        cogs_dir = './cogs'
+        for cog_category in os.listdir(cogs_dir):
+            category_path = os.path.join(cogs_dir, cog_category)
+            
+            # Skip __init__.py and non-directories
+            if not os.path.isdir(category_path) or cog_category.startswith('_'):
+                continue
+                
+            # Look for cog modules in each subfolder
+            for filename in os.listdir(category_path):
+                if filename.endswith('.py') and not filename.startswith('_'):
+                    cog_path = f'cogs.{cog_category}.{filename[:-3]}'
+                    
+                    # Check if this is a valid cog module (has setup function)
+                    module_path = os.path.join(category_path, filename)
+                    spec = importlib.util.spec_from_file_location(cog_path, module_path)
+                    if spec is None:
+                        continue
+                        
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    
+                    if hasattr(module, 'setup'):
+                        try:
+                            await self.load_extension(cog_path)
+                            self.logger.info(f'Loaded extension: {cog_path}')
+                        except Exception as e:
+                            self.logger.error(f'Failed to load extension {cog_path}: {e}')
         
         # Sync commands with Discord
         if GUILD_ID:
